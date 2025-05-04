@@ -7,4 +7,5 @@ public class Constant {
     public static final String CALLER_ID = "Agung Hapzah <101>";
     public static final String PREFIX_PROTOCOL = "PJSIP/";
     public static String ACTION_ID ="id-call-" + System.currentTimeMillis();
+    public static final String SIP_PROVIDER = "@DALNET_TEST";
 }

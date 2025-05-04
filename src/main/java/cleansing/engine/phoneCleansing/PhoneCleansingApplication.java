@@ -10,6 +10,4 @@ public class PhoneCleansingApplication {
 	public static void main(String[] args) {
 		SpringApplication.run(PhoneCleansingApplication.class, args);
 	}
-
-
 }
