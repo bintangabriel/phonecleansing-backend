@@ -1,15 +1,24 @@
 package cleansing.engine.phoneCleansing.service;
 
+import cleansing.engine.phoneCleansing.model.Log;
+import cleansing.engine.phoneCleansing.repository.LogDb;
 import cleansing.engine.phoneCleansing.util.Constant;
 import org.asteriskjava.manager.*;
+import org.asteriskjava.manager.action.HangupAction;
 import org.asteriskjava.manager.action.OriginateAction;
 import org.asteriskjava.manager.event.*;
 import org.asteriskjava.manager.response.ManagerResponse;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import io.github.cdimascio.dotenv.Dotenv;
 
+import java.util.HashMap;
+import java.util.Map;
+import java.util.Optional;
 @Service
 public class CallServiceImpl implements CallService, ManagerEventListener {
+    @Autowired
+    LogDb logDb;
     private ManagerConnection managerConnection;
     private final Dotenv dotenv = Dotenv.load();
 
@@ -29,13 +38,16 @@ public class CallServiceImpl implements CallService, ManagerEventListener {
         }
     }
     @Override
-    public String makeCall(String extension) {
+    public Map<String, String> makeCall(String extension) {
         openConnection();
+        Map<String, String> data = new HashMap<>();
+        String actionId = Constant.ACTION_ID;
+        String callerId = Constant.CALLER_ID;
+        String uuid = callerId.substring(5);
         try {
-            String actionId = Constant.ACTION_ID;
             OriginateAction originateAction = new OriginateAction();
             originateAction.setActionId(actionId);
-            originateAction.setCallerId(Constant.CALLER_ID);
+            originateAction.setCallerId(callerId + " <" + uuid + ">");
 
             // Direct call to extension
 //            originateAction.setChannel(Constant.PREFIX_PROTOCOL + extension);
@@ -43,14 +55,24 @@ public class CallServiceImpl implements CallService, ManagerEventListener {
             originateAction.setApplication("Playback");
             originateAction.setData(Constant.AUDIO_FILE_NAME);
 
+            Map<String, String> vars = new HashMap<>();
+            vars.put("X-ActionId", actionId);
+            originateAction.setVariables(vars);
+
             // Keep it async
             originateAction.setAsync(true);
 
             ManagerResponse response = managerConnection.sendAction(originateAction, 30000);
-            return response.getResponse();
+            data.put("status", response.getResponse());
+            data.put("actionId", actionId);
+            System.out.println("Caller id: " + originateAction.getCallerId());
+            return data;
         } catch (Exception e) {
             e.printStackTrace();
-            return "Call failed: " + e.getMessage();
+            data.put("status", "Failed");
+            data.put("actionId", actionId);
+            data.put("data", e.getMessage());
+            return data;
         }
     }
 
@@ -74,8 +96,16 @@ public class CallServiceImpl implements CallService, ManagerEventListener {
             System.out.println("🔴 Hangup with cause: " + e.getCauseTxt());
         } else if (event instanceof DialEvent e) {
             System.out.println("🔄 Dialing from " + e.getCallerIdNum() +  " to " + e.getDestination());
+        } else if (event instanceof VarSetEvent e) {
+            String channel = e.getChannel();
+            String actionId = e.getValue();
+            if (channel != null && actionId.startsWith("id-call-")) {
+                Log log = new Log();
+                log.setAction(e.getValue());
+                log.setChannel(e.getChannel());
+                logDb.save(log);
+            }
         }
-
     }
 
     @Override
@@ -84,5 +114,26 @@ public class CallServiceImpl implements CallService, ManagerEventListener {
             return channel.split("/")[1].split("-")[0];
         }
         return "Unknown";
+    }
+    @Override
+    public Map<String, String> terminateCall(String actionId) {
+        Map<String, String> data = new HashMap<>();
+        Optional<Log> log = logDb.findByAction(actionId);
+        String channel = log.get().getChannel();
+        if (channel != null) {
+            try {
+                HangupAction hangupAction = new HangupAction(channel);
+                ManagerResponse response = managerConnection.sendAction(hangupAction);
+                data.put("status", response.getResponse());
+            } catch (Exception e) {
+                e.printStackTrace();
+                data.put("status", "Failed");
+                data.put("data", e.getMessage());
+            }
+        } else {
+            data.put("status", "Failed");
+            data.put("data", "Call with specified action ID not found");
+        }
+        return data;
     }
 }
