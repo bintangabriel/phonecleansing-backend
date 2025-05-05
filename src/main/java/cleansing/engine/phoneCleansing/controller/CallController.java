@@ -36,7 +36,7 @@ public class CallController {
     }
 
     @PostMapping("/call/terminate")
-    public Map<String, String> terminateCall(@RequestParam String extension) {
-        return callService.terminateCall(extension);
+    public Map<String, String> terminateCall(@RequestParam String actionId) {
+        return callService.terminateCall(actionId);
     }
 }
