@@ -25,7 +25,7 @@ dependencies {
 	testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
 	implementation  'io.github.ari4java:ari4java:0.17.0'
 	implementation 'ch.qos.logback:logback-classic:1.5.18'
-	implementation 'org.asteriskjava:asterisk-java:3.41.0'
+	implementation 'org.asteriskjava:asterisk-java:3.5.0'
 	implementation 'io.github.cdimascio:dotenv-java:3.2.0'
 	implementation 'org.springframework.boot:spring-boot-starter-data-jpa'
 	runtimeOnly 'org.mariadb.jdbc:mariadb-java-client'
